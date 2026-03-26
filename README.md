@@ -14,7 +14,7 @@ Live Demo Built on Shelby Aptos Network
 
 With an intuitive interface and blockchain-integrated architecture, Shelbox transforms traditional file storage into a trustless and transparent experience. Every file interaction is optimized for speed, security, and long-term reliability.
 
-> 🔗 **Live at:** [https://shelbox-fuongpp3m-avins-projects-94a43281.vercel.app](https://shelbox-fuongpp3m-avins-projects-94a43281.vercel.app)
+> 🔗 **Live at:** [https://shelbox.vercel.app](https://shelbox.vercel.app)
 
 ---
 
@@ -134,7 +134,7 @@ Explorer:       https://explorer.shelby.xyz/shelbynet
 
 ## 🔗 Links
 
-- 🌐 **Live App:** [shelbox-fuongpp3m-avins-projects-94a43281.vercel.app](https://shelbox-fuongpp3m-avins-projects-94a43281.vercel.app)
+- 🌐 **Live App:** [shelbox.vercel.app](https://shelbox.vercel.app)
 - 📚 **Shelby Docs:** [docs.shelby.xyz](https://docs.shelby.xyz)
 - 🔍 **Shelby Explorer:** [explorer.shelby.xyz/shelbynet](https://explorer.shelby.xyz/shelbynet)
 - 💬 **Shelby Discord:** [discord.gg/shelby](https://discord.gg/shelby)

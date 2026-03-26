@@ -311,44 +311,16 @@ async function onWalletConnected(address) {
     // 🔥 CREATE proper Account object untuk Shelby SDK
     console.log('📦 Creating Account object for Shelby SDK...');
     
-    const accountForShelby = {
-      accountAddress: address,
-      publicKey: walletAccount?.publicKey || null,
-      signingScheme: 'single_signature_scheme',
-      
-      sign: async (message) => {
-        try {
-          console.log('🔐 Signing message...');
-          if (walletCore && typeof walletCore.signMessage === 'function') {
-            const signature = await walletCore.signMessage({
-              message: message,
-              nonce: Math.random().toString(36).substring(7),
-            });
-            console.log('✅ Signed');
-            return signature;
-          }
-          throw new Error('Wallet signing not available');
-        } catch (err) {
-          console.error('Sign error:', err);
-          throw err;
-        }
-      },
-
-      signTransaction: async (transaction) => {
-        try {
-          console.log('🔐 Signing transaction...');
-          if (window.aptos?.signTransaction) {
-            const signedTxn = await window.aptos.signTransaction(transaction);
-            console.log('✅ Transaction signed');
-            return signedTxn;
-          }
-          throw new Error('Transaction signing not available');
-        } catch (err) {
-          console.error('Transaction sign error:', err);
-          throw err;
-        }
-      }
-    };
+    // Ensure wallet account is properly set for signing
+    if (window.aptos) {
+      walletAccount = window.aptos;
+      console.log('✅ Using window.aptos for signing');
+    } else if (walletCore?.wallet) {
+      walletAccount = walletCore.wallet;
+      console.log('✅ Using WalletCore.wallet for signing');
+    } else {
+      console.warn('⚠️ No wallet account available for signing');
+    }
 
     // Update UI
     const walletStatus = document.getElementById('ws');
@@ -441,10 +413,42 @@ async function loadFiles() {
   if (!walletAddress) return;
   
   try {
-    console.log('Loading files for address:', walletAddress);
-    // TODO: Implement file loading from Shelby protocol
+    console.log('📁 Loading files for address:', walletAddress);
+    
+    // Get file list element
+    const fileList = document.getElementById('fileList');
+    if (!fileList) return;
+    
+    // Show loading state
+    fileList.innerHTML = '<div style="text-align:center; padding:20px; color:var(--text-muted);">Loading files...</div>';
+    
+    // TODO: Implement actual file listing from Shelby protocol
+    // For now, show a placeholder
+    setTimeout(() => {
+      if (files.length === 0) {
+        fileList.innerHTML = '<div style="text-align:center; padding:20px; color:var(--text-muted);">No files uploaded yet</div>';
+      } else {
+        fileList.innerHTML = files.map(file => `
+          <div class="file-item">
+            <div class="file-info">
+              <div class="file-name">${file.name}</div>
+              <div class="file-meta">${file.size} • ${new Date(file.uploaded).toLocaleDateString()}</div>
+            </div>
+            <div class="file-actions">
+              <button class="btn-small" onclick="window._sx.dl('${file.id}')">Download</button>
+              <button class="btn-small" onclick="window._sx.del('${file.id}')">Delete</button>
+            </div>
+          </div>
+        `).join('');
+      }
+    }, 1000);
+    
   } catch (error) {
-    console.error('Load files error:', error);
+    console.error('❌ Load files error:', error);
+    const fileList = document.getElementById('fileList');
+    if (fileList) {
+      fileList.innerHTML = '<div style="text-align:center; padding:20px; color:var(--error);">Error loading files</div>';
+    }
   }
 }
 
@@ -611,11 +615,76 @@ export async function handleUpload() {
   }
   
   try {
-    toast('📤 Uploading files...', 'ok');
-    console.log('Uploading files:', sel);
-    // TODO: Implement file upload using shelby.js
+    toast('📤 Starting upload...', 'ok');
+    console.log('📤 Uploading files:', sel);
+    
+    // Show progress bar
+    const pw = document.getElementById('pw');
+    const pl = document.getElementById('pl');
+    const pp = document.getElementById('pp');
+    const pf = document.getElementById('pf');
+    
+    if (pw) pw.classList.add('on');
+    if (pl) pl.textContent = 'Uploading files...';
+    if (pp) pp.textContent = '0%';
+    if (pf) pf.style.width = '0%';
+    
+    // Get blob destination and expiry from form
+    const blobDest = document.getElementById('bd')?.value || `files/${sel[0].name}`;
+    const expiry = document.getElementById('ex')?.value || '1y';
+    
+    for (let i = 0; i < sel.length; i++) {
+      const file = sel[i];
+      const blobName = blobDest.replace('{filename}', file.name);
+      
+      // Update progress
+      const progress = Math.round(((i + 1) / sel.length) * 100);
+      if (pl) pl.textContent = `Uploading ${file.name}...`;
+      if (pp) pp.textContent = progress + '%';
+      if (pf) pf.style.width = progress + '%';
+      
+      console.log(`📤 Uploading file ${i + 1}/${sel.length}: ${file.name}`);
+      
+      // Convert file to buffer
+      const buffer = await file.arrayBuffer();
+      const fileData = new Uint8Array(buffer);
+      
+      // Upload using shelby.js
+      const result = await uploadToShelby(fileData, blobName, expiry, walletAccount, walletAddress);
+      
+      if (result.success) {
+        console.log('✅ Upload successful:', result);
+        toast(`✅ ${file.name} uploaded successfully!`, 'ok');
+      } else {
+        console.error('❌ Upload failed:', result.error);
+        toast(`❌ ${file.name} upload failed: ${result.error}`, 'er');
+      }
+    }
+    
+    // Hide progress bar
+    if (pw) pw.classList.remove('on');
+    
+    // Clear selection
+    sel = [];
+    const selPill = document.getElementById('sp');
+    if (selPill) selPill.style.display = 'none';
+    
+    // Reset file input
+    const fileInput = document.getElementById('fin');
+    if (fileInput) fileInput.value = '';
+    
+    // Load files to update the file list
+    await loadFiles();
+    
+    toast('🎉 Upload completed!', 'ok');
+    
   } catch (error) {
+    console.error('❌ Upload error:', error);
     toast('❌ Upload failed: ' + error.message, 'er');
+    
+    // Hide progress bar
+    const pw = document.getElementById('pw');
+    if (pw) pw.classList.remove('on');
   }
 }
 

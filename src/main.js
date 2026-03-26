@@ -1,6 +1,6 @@
 /**
- * SHELBOX - Decentralized File Storage
- * Wallet: Aptos Wallet Adapter Core with Petra integration
+ * SHELBOX - Decentralized File Storage (using working Sheltrix wallet connection)
+ * Wallet: Petra (window.aptos / window.petra) + AIP-62 WalletCore fallback
  * Storage: @shelby-protocol/sdk via shelby.js
  */
 
@@ -15,249 +15,299 @@ import { uploadToShelby, downloadFromShelby, SHELBY_CONFIG, getBalance } from '.
 // ── STATE ────────────────────────────────────────────
 let conn = false, files = [], flt = 'all', sel = [];
 let walletAddress = null, walletAccount = null, walletCore = null;
-let isWalletCoreInitialized = false;
+
+// 🔥 EXPORT walletCore ke global supaya bisa diakses dari shelby.js
+window.__walletCore = null;
 
 // ── BOOT ─────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
   initUI();
   await initWalletCore();
-  log('SHELBOX · Ready · Wallet Adapter Core loaded', 'ok');
+  log('SHELBOX · Ready · SDK v0.2.4 loaded', 'ok');
 });
 
 // ── WALLET CORE INIT ─────────────────────────────────
 async function initWalletCore() {
   try {
-    console.log('🔧 Initializing Aptos Wallet Adapter Core with Shelbynet...');
+    console.log('🔧 Starting WalletCore initialization...');
 
-    // Define Shelbynet network configuration
-    const shelbynet = {
-      name: 'Shelbynet',
-      chainId: 'shelbynet',
-      url: 'https://api.shelbynet.shelby.xyz/v1',
-      faucetUrl: 'https://faucet.shelbynet.shelby.xyz'
-    };
-
-    // Initialize WalletCore with Shelbynet network
-    walletCore = new WalletCore(
-      ["Petra", "Martian"], // Supported wallets
-      [shelbynet], // Custom networks - Shelbynet
-      {
-        onError: (err) => {
-          console.error('WalletCore error:', err);
-          log('WALLET_ERR · ' + (err?.message || err), 'er');
-        },
-        autoConnect: false, // Don't auto-connect on init
-        defaultNetwork: shelbynet.name // Set Shelbynet as default
+    walletCore = new WalletCore([], [], {
+      onError: (err) => {
+        console.error('WalletCore error callback:', err);
+        log('WALLET_ERR · ' + (err?.message || err), 'er');
       }
-    );
+    });
 
-    // Wait for wallets to be registered
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    console.log('✅ WalletCore created');
+    window.__walletCore = walletCore; // 🔥 expose segera setelah dibuat
+    console.log('🔍 WalletCore methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(walletCore)).join(', '));
+    log('WALLET_CORE · Initialized', 'ok');
 
-    console.log('✅ WalletCore initialized with Shelbynet');
-    console.log('📋 Available wallets:', walletCore.wallets.map(w => w.name));
-    console.log('🌐 Available networks:', walletCore.networks.map(n => n.name));
-    
-    isWalletCoreInitialized = true;
-    window.__walletCore = walletCore;
-    
-    // Set up event listeners
-    setupWalletEventListeners();
-    
-    // Auto-switch to Shelbynet if possible
-    await switchToShelbynet();
-    
-    log('WALLET_CORE · Initialized with Shelbynet and ' + walletCore.wallets.length + ' wallets', 'ok');
-    
-  } catch (error) {
-    console.error('❌ WalletCore initialization failed:', error);
-    log('WALLET_CORE_INIT_FAILED · ' + error.message, 'er');
-  }
-}
-
-// ── SWITCH TO SHELBYNET ───────────────────────────────
-async function switchToShelbynet() {
-  try {
-    if (!walletCore) return;
-    
-    console.log('🔄 Switching to Shelbynet...');
-    
-    // Try to switch network to Shelbynet
-    const shelbynet = walletCore.networks.find(n => n.name === 'Shelbynet');
-    if (shelbynet) {
-      await walletCore.switchNetwork('Shelbynet');
-      console.log('✅ Switched to Shelbynet');
-      log('NETWORK · Switched to Shelbynet', 'ok');
-    } else {
-      console.warn('⚠️ Shelbynet not found in available networks');
-      log('NETWORK · Shelbynet not available', 'in');
-    }
-  } catch (error) {
-    console.warn('⚠️ Could not switch to Shelbynet:', error);
-    log('NETWORK_SWITCH_FAILED · ' + error.message, 'in');
-  }
-}
-
-// ── WALLET EVENT LISTENERS ───────────────────────────
-function setupWalletEventListeners() {
-  if (!walletCore) return;
-
-  walletCore.on('connect', async (account) => {
-    try {
-      console.log('✅ Wallet connected:', account);
-      walletAccount = account;
-      walletAddress = account.address.toString();
-      conn = true;
-      
-      await onWalletConnected(walletAddress);
-      closeModal();
-      log('WALLET_CONNECTED · ' + walletAddress.slice(0, 10) + '...', 'ok');
-    } catch (error) {
-      console.error('❌ Connect handler error:', error);
-      log('CONNECT_HANDLER_ERROR · ' + error.message, 'er');
-    }
-  });
-
-  walletCore.on('disconnect', () => {
-    try {
-      console.log('🔌 Wallet disconnected');
-      conn = false;
-      walletAddress = null;
-      walletAccount = null;
-      onWalletDisconnected();
-      log('WALLET_DISCONNECTED', 'in');
-    } catch (error) {
-      console.error('❌ Disconnect handler error:', error);
-    }
-  });
-
-  walletCore.on('accountChange', async (account) => {
-    try {
-      console.log('🔄 Account changed:', account);
-      if (account) {
+    // ✅ CONNECT EVENT
+    console.log('📌 Setting up connect listener...');
+    walletCore.on('connect', async (account) => {
+      try {
+        console.log('✅ Connect event fired, account:', account);
         walletAccount = account;
-        walletAddress = account.address.toString();
-        await onWalletConnected(walletAddress);
-        log('ACCOUNT_CHANGED · ' + walletAddress.slice(0, 10) + '...', 'in');
+
+        let addr = '';
+        if (typeof account?.address === 'string') {
+          addr = account.address;
+        } else if (account?.address?.toString) {
+          addr = account.address.toString();
+        } else if (account?.accounts?.[0]?.address) {
+          addr = account.accounts[0].address.toString();
+        }
+
+        console.log('📍 Address extracted:', addr);
+
+        if (!addr || !addr.startsWith('0x')) {
+          console.warn('❌ ADDRESS INVALID:', account);
+          return;
+        }
+
+        walletAddress = addr;
+        console.log('🎉 Calling onWalletConnected with:', addr);
+        await onWalletConnected(addr);
+      } catch (connectErr) {
+        console.error('❌ Connect handler error:', connectErr);
       }
-    } catch (error) {
-      console.error('❌ Account change handler error:', error);
-    }
-  });
-}
+    });
 
-// ── WALLET DETECTION ───────────────────────────────────
-export function detectWallets() {
-  if (!isWalletCoreInitialized || !walletCore) {
-    return [];
+    // ✅ DISCONNECT EVENT
+    console.log('📌 Setting up disconnect listener...');
+    walletCore.on('disconnect', () => {
+      try {
+        console.log('🔌 Disconnect event fired');
+        onWalletDisconnected();
+      } catch (disconnectErr) {
+        console.error('❌ Disconnect handler error:', disconnectErr);
+      }
+    });
+
+    // ✅ ACCOUNT CHANGE EVENT
+    console.log('📌 Setting up accountChange listener...');
+    walletCore.on('accountChange', async (account) => {
+      try {
+        console.log('🔄 AccountChange event fired, account:', account);
+        walletAccount = account;
+
+        let addr = '';
+        if (typeof account?.address === 'string') {
+          addr = account.address;
+        } else if (account?.address?.toString) {
+          addr = account.address.toString();
+        } else if (account?.accounts?.[0]?.address) {
+          addr = account.accounts[0].address.toString();
+        }
+
+        if (addr) {
+          walletAddress = addr;
+          console.log('✅ Account changed to:', addr);
+          log('ACCOUNT_CHANGE · ' + addr.slice(0, 12) + '...', 'in');
+        }
+      } catch (accountChangeErr) {
+        console.error('❌ AccountChange handler error:', accountChangeErr);
+      }
+    });
+
+    console.log('⏳ Waiting 800ms for wallet detection...');
+    await new Promise(r => setTimeout(r, 800));
+
+    console.log('✅ Timeout complete');
+
+    const detected = walletCore.wallets || [];
+    console.log('📱 Detected wallets:', detected.map(w => w.name));
+    log('WALLETS · [' + detected.map(w => w.name).join(', ') + ']', 'ok');
+    log('WALLET_CORE · Ready', 'ok');
+
+    console.log('✅ WalletCore initialization complete');
+
+  } catch (err) {
+    console.error('❌ WalletCore initialization error:', err);
+    console.error('   Message:', err?.message);
+    console.error('   Stack:', err?.stack);
+
+    log('WALLET_CORE · ' + err.message + ' — using fallback', 'in');
+    walletCore = null;
   }
-  
-  const wallets = walletCore.wallets.map(w => ({
-    name: w.name,
-    available: true,
-    ready: w.readyState === 'Installed'
-  }));
-  
-  console.log('Available wallets:', wallets);
-  return wallets;
 }
 
-// ── CONNECT WALLET ─────────────────────────────────────
-export async function connectWallet(walletName = 'Petra') {
-  if (!isWalletCoreInitialized || !walletCore) {
-    toast('❌ Wallet adapter not initialized', 'er');
-    log('WALLET_NOT_INITIALIZED', 'er');
+// helper: extract address from various response formats
+function extractAddr(obj) {
+  if (!obj) return null;
+  const candidates = [
+    obj?.address, obj?.publicKey,
+    obj?.accounts?.[0]?.address, obj?.accounts?.[0],
+    obj?.account?.address, obj?.account, obj
+  ];
+  for (const c of candidates) {
+    if (!c) continue;
+    if (typeof c === 'string' && c.startsWith('0x') && c.length > 10) return c;
+    if (typeof c === 'object') {
+      const s = c.toString?.();
+      if (s && s.startsWith('0x') && s.length > 10) return s;
+    }
+  }
+  return null;
+}
+
+// ── CONNECT ──────────────────────────────────────────
+export async function connectWallet() {
+  hd('s1'); sh('s2');
+  log('CONNECT · Starting...', 'in');
+
+  try {
+    if (walletCore) {
+      const wallets = walletCore.wallets || [];
+      const petra = wallets.find(w =>
+        w.name === 'Petra' || w.name?.toLowerCase().includes('petra')
+      );
+
+      if (petra) {
+        log('CONNECT · Petra → WalletCore', 'in');
+        await walletCore.connect(petra.name);
+        return;
+      }
+    }
+
+    // Fallback to manual connection
+    await connectManual();
+
+  } catch (err) {
+    hd('s2'); sh('s1');
+    const msg = err?.message || '';
+
+    if (err?.code === 4001 || /cancel|reject|denied|user/i.test(msg)) {
+      toast('❌ Cancelled', 'er');
+      log('CONNECT · Cancelled', 'er');
+    } else {
+      toast('❌ ' + msg, 'er');
+      log('ERROR · ' + msg, 'er');
+    }
+  }
+}
+
+async function connectManual() {
+  await new Promise(r => setTimeout(r, 300));
+  log('DEBUG · aptos=' + (!!window.aptos) + ' petra=' + (!!window.petra), 'in');
+
+  let resp = null;
+
+  if (window.aptos?.connect) {
+    try {
+      log('CONNECT · window.aptos.connect()...', 'in');
+      resp = await window.aptos.connect();
+      log('DEBUG · resp: ' + JSON.stringify(resp), 'in');
+    } catch (e) {
+      if (e?.code === 4001 || /cancel|reject|denied/i.test(e?.message || '')) {
+        hd('s2'); sh('s1'); toast('❌ Cancelled', 'er'); return;
+      }
+      log('DEBUG · aptos err: ' + e.message, 'in');
+    }
+  }
+
+  if (!resp && window.petra?.connect) {
+    try {
+      log('CONNECT · window.petra.connect()...', 'in');
+      resp = await window.petra.connect();
+      log('DEBUG · resp: ' + JSON.stringify(resp), 'in');
+    } catch (e) {
+      if (e?.code === 4001 || /cancel|reject|denied/i.test(e?.message || '')) {
+        hd('s2'); sh('s1'); toast('❌ Cancelled', 'er'); return;
+      }
+      log('DEBUG · petra err: ' + e.message, 'in');
+    }
+  }
+
+  if (!resp) {
+    hd('s2'); sh('s1');
+    if (!window.aptos && !window.petra) {
+      toast('❌ Petra not detected! Install Petra first.', 'er');
+      log('ERROR · Install Petra from petra.app', 'er');
+    } else {
+      toast('❌ Petra not responding. Try Ctrl+Shift+R', 'er');
+      log('ERROR · No response — hard refresh & retry', 'er');
+    }
     return;
   }
 
+  walletAccount = window.aptos; // ✅ ambil wallet asli Petra
+
+  let addr = '';
+
   try {
-    log('CONNECT · Connecting to ' + walletName + ' on Shelbynet...', 'in');
-    
-    // Find the wallet
-    const wallet = walletCore.wallets.find(w => w.name === walletName);
-    
-    if (!wallet) {
-      toast('❌ ' + walletName + ' wallet not found', 'er');
-      log('WALLET_NOT_FOUND · ' + walletName, 'er');
-      return;
-    }
-
-    if (wallet.readyState !== 'Installed') {
-      toast('❌ ' + walletName + ' wallet not installed', 'er');
-      log('WALLET_NOT_INSTALLED · ' + walletName, 'er');
-      // Provide installation link
-      if (walletName === 'Petra') {
-        toast('💡 Install Petra: https://petra.app', 'in');
-      } else if (walletName === 'Martian') {
-        toast('💡 Install Martian: https://www.martianwallet.xyz/', 'in');
-      }
-      return;
-    }
-
-    // Check if wallet is on correct network
-    const currentNetwork = walletCore.network;
-    if (currentNetwork?.name !== 'Shelbynet') {
-      log('NETWORK · Switching to Shelbynet before connection...', 'in');
-      await switchToShelbynet();
-    }
-
-    // Connect to the wallet
-    console.log('🔗 Connecting to ' + walletName + '...');
-    await walletCore.connect(walletName);
-    
-  } catch (error) {
-    console.error('❌ Wallet connection error:', error);
-    
-    const msg = error?.message || '';
-    if (error?.code === 4001 || /cancel|reject|denied|user/i.test(msg)) {
-      toast('❌ Connection cancelled', 'er');
-      log('CONNECT_CANCELLED', 'er');
-    } else if (error?.message?.includes('network')) {
-      toast('❌ Network error. Make sure Petra is on Shelbynet', 'er');
-      log('NETWORK_ERROR · ' + msg, 'er');
-      // Show network setup instructions
-      setTimeout(() => {
-        toast('💡 Setup Shelbynet in Petra: Settings → Network → Add Custom', 'in');
-      }, 2000);
-    } else {
-      toast('❌ ' + msg, 'er');
-      log('CONNECT_ERROR · ' + msg, 'er');
-    }
+    const acc = await window.aptos.account();
+    addr = acc.address;
+  } catch (e) {
+    log('ERROR · Cannot get address: ' + e.message, 'er');
+    return;
   }
-}
 
-// ── DISCONNECT WALLET ─────────────────────────────────
-export async function disconnectWallet() {
-  if (!walletCore) return;
-  
-  try {
-    await walletCore.disconnect();
-    log('WALLET_DISCONNECTED', 'ok');
-  } catch (error) {
-    console.error('❌ Disconnect error:', error);
-    log('DISCONNECT_ERROR · ' + error.message, 'er');
+  if (!addr) {
+    hd('s2'); sh('s1');
+    log('ERROR · Address empty', 'er');
+    toast('❌ Failed to get wallet address', 'er');
+    return;
   }
+
+  walletAddress = addr;
+  onWalletConnected(addr);
 }
 
-// ── GET WALLET ACCOUNT ────────────────────────────────
-export function getWalletAccount() {
-  return walletAccount;
-}
-
-// ── IS WALLET CONNECTED ────────────────────────────────
-export function isWalletConnected() {
-  return conn && walletAddress !== null;
-}
-
-// ── ON WALLET CONNECTED ─────────────────────────────────
+// ── ON CONNECTED ─────────────────────────────────────
 async function onWalletConnected(address) {
   try {
     console.log('🎯 onWalletConnected called with:', address);
-    
+
     conn = true;
     walletAddress = address;
 
     log('CONNECTED · ' + address.slice(0, 14) + '...', 'ok');
+    hd('s2'); 
+    sh('s4');
+
+    // 🔥 CREATE proper Account object untuk Shelby SDK
+    console.log('📦 Creating Account object for Shelby SDK...');
+    
+    const accountForShelby = {
+      accountAddress: address,
+      publicKey: walletAccount?.publicKey || null,
+      signingScheme: 'single_signature_scheme',
+      
+      sign: async (message) => {
+        try {
+          console.log('🔐 Signing message...');
+          if (walletCore && typeof walletCore.signMessage === 'function') {
+            const signature = await walletCore.signMessage({
+              message: message,
+              nonce: Math.random().toString(36).substring(7),
+            });
+            console.log('✅ Signed');
+            return signature;
+          }
+          throw new Error('Wallet signing not available');
+        } catch (err) {
+          console.error('Sign error:', err);
+          throw err;
+        }
+      },
+
+      signTransaction: async (transaction) => {
+        try {
+          console.log('🔐 Signing transaction...');
+          if (window.aptos?.signTransaction) {
+            const signedTxn = await window.aptos.signTransaction(transaction);
+            console.log('✅ Transaction signed');
+            return signedTxn;
+          }
+          throw new Error('Transaction signing not available');
+        } catch (err) {
+          console.error('Transaction sign error:', err);
+          throw err;
+        }
+      }
+    };
 
     // Update UI
     const walletStatus = document.getElementById('ws');
@@ -268,14 +318,8 @@ async function onWalletConnected(address) {
     // Update network status
     const networkStatus = document.getElementById('network-status');
     if (networkStatus) {
-      const currentNetwork = walletCore?.network;
-      if (currentNetwork) {
-        networkStatus.textContent = currentNetwork.name;
-        networkStatus.style.color = currentNetwork.name === 'Shelbynet' ? 'var(--success)' : 'var(--warning)';
-      } else {
-        networkStatus.textContent = 'Unknown';
-        networkStatus.style.color = 'var(--error)';
-      }
+      networkStatus.textContent = 'Shelbynet'; // Assume Shelbynet for now
+      networkStatus.style.color = 'var(--success)';
     }
 
     // Update wallet button
@@ -285,23 +329,27 @@ async function onWalletConnected(address) {
     }
 
     // Get balance
+    let aptBal = '0.0000', usdBal = '0.00';
     try {
       const balance = await getBalance(address);
-      const aptEl = document.getElementById('apt');
-      const usdEl = document.getElementById('usd');
-      
-      if (aptEl && balance.apt) {
-        aptEl.textContent = parseFloat(balance.apt).toFixed(4);
-      }
-      if (usdEl && balance.usd) {
-        usdEl.textContent = parseFloat(balance.usd).toFixed(2);
-      }
+      if (balance.apt) aptBal = parseFloat(balance.apt).toFixed(4);
+      if (balance.usd) usdBal = parseFloat(balance.usd).toFixed(2);
     } catch (balanceErr) {
       console.error('Balance fetch error:', balanceErr);
     }
 
+    const aptEl = document.getElementById('apt');
+    const usdEl = document.getElementById('usd');
+    if (aptEl) aptEl.textContent = aptBal;
+    if (usdEl) usdEl.textContent = usdBal;
+
     // Load files
     await loadFiles();
+
+    // Close modal
+    closeModal();
+
+    log('WALLET_READY · ' + address.slice(0, 10) + '...', 'ok');
     
   } catch (error) {
     console.error('❌ onWalletConnected error:', error);
@@ -309,7 +357,7 @@ async function onWalletConnected(address) {
   }
 }
 
-// ── ON WALLET DISCONNECTED ───────────────────────────────
+// ── ON DISCONNECTED ───────────────────────────────────
 function onWalletDisconnected() {
   conn = false;
   walletAddress = null;
@@ -319,6 +367,12 @@ function onWalletDisconnected() {
   const walletStatus = document.getElementById('ws');
   if (walletStatus) {
     walletStatus.textContent = '—';
+  }
+
+  const networkStatus = document.getElementById('network-status');
+  if (networkStatus) {
+    networkStatus.textContent = 'Shelbynet';
+    networkStatus.style.color = 'var(--text-muted)';
   }
 
   const walletBtn = document.getElementById('walletBtn');
@@ -337,6 +391,8 @@ function onWalletDisconnected() {
   if (fileList) fileList.innerHTML = '';
   
   files = [];
+  
+  log('DISCONNECTED', 'in');
 }
 
 // ── FILE OPERATIONS ────────────────────────────────────
@@ -344,7 +400,6 @@ async function loadFiles() {
   if (!walletAddress) return;
   
   try {
-    // This would integrate with the shelby.js file operations
     console.log('Loading files for address:', walletAddress);
     // TODO: Implement file loading from Shelby protocol
   } catch (error) {
@@ -355,12 +410,10 @@ async function loadFiles() {
 // ── LOGGING ─────────────────────────────────────────────
 function log(msg, type = 'in') {
   console.log('[' + type.toUpperCase() + '] ' + msg);
-  // TODO: Update UI log display if needed
 }
 
 // ── TOAST NOTIFICATIONS ────────────────────────────────
 function toast(msg, type = 'ok') {
-  // Simple toast implementation
   const toast = document.createElement('div');
   toast.textContent = msg;
   toast.style.cssText = `
@@ -386,7 +439,6 @@ function toast(msg, type = 'ok') {
 // ── MODAL FUNCTIONS ─────────────────────────────────────
 export function openModal() {
   if (conn) { 
-    // If already connected, show disconnect modal
     toast('Already connected', 'ok');
     return; 
   }
@@ -408,7 +460,7 @@ function updateWalletStatus() {
   const petraStatus = document.getElementById('petra-status');
   const martianStatus = document.getElementById('martian-status');
   
-  if (!isWalletCoreInitialized || !walletCore) {
+  if (!walletCore) {
     if (petraStatus) {
       petraStatus.textContent = 'Initializing...';
       petraStatus.style.color = 'var(--text-muted)';
@@ -420,7 +472,7 @@ function updateWalletStatus() {
     return;
   }
   
-  const wallets = walletCore.wallets;
+  const wallets = walletCore.wallets || [];
   const petra = wallets.find(w => w.name === 'Petra');
   const martian = wallets.find(w => w.name === 'Martian');
   
@@ -470,10 +522,6 @@ function initUI() {
     openModal,
     closeModal,
     connectWallet,
-    disconnectWallet,
-    detectWallets,
-    getWalletAccount,
-    isWalletConnected,
     onSel: handleFileSelection,
     doUp: handleUpload,
     filt: handleFilter,
@@ -485,6 +533,10 @@ function initUI() {
     switchTab: handleSwitchTab,
   };
 }
+
+// ── HELPER FUNCTIONS ────────────────────────────────────
+export function sh(id) { const el = document.getElementById(id); if (el) el.style.display = 'block'; }
+export function hd(id) { const el = document.getElementById(id); if (el) el.style.display = 'none'; }
 
 // ── FILE HANDLERS ───────────────────────────────────────
 export function handleFileSelection(input) {
@@ -513,9 +565,9 @@ export async function handleUpload() {
   }
   
   try {
-    // TODO: Implement file upload using shelby.js
     toast('📤 Uploading files...', 'ok');
     console.log('Uploading files:', sel);
+    // TODO: Implement file upload using shelby.js
   } catch (error) {
     toast('❌ Upload failed: ' + error.message, 'er');
   }

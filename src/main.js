@@ -153,12 +153,59 @@ function extractAddr(obj) {
   return null;
 }
 
+// ── WALLET DETECTION ───────────────────────────────────
+export function detectWallets() {
+  const wallets = [];
+  
+  if (window.petra) {
+    wallets.push({ name: 'Petra', available: true });
+  }
+  
+  if (window.martian) {
+    wallets.push({ name: 'Martian', available: true });
+  }
+  
+  console.log('Available wallets:', wallets);
+  return wallets;
+}
+
 // ── CONNECT ──────────────────────────────────────────
-export async function connectWallet() {
+export async function connectWallet(walletName = 'petra') {
   hd('s1'); sh('s2');
   log('CONNECT · Starting...', 'in');
 
   try {
+    // Simple direct wallet connection for Petra
+    if (walletName === 'petra' && window.petra?.connect) {
+      log('CONNECT · Connecting to Petra...', 'in');
+      const response = await window.petra.connect();
+      console.log('Petra connect response:', response);
+      
+      if (response && response.address) {
+        walletAddress = response.address;
+        walletAccount = window.petra;
+        await onWalletConnected(response.address);
+        closeModal();
+        return;
+      }
+    }
+    
+    // Simple direct wallet connection for Martian
+    if (walletName === 'martian' && window.martian?.connect) {
+      log('CONNECT · Connecting to Martian...', 'in');
+      const response = await window.martian.connect();
+      console.log('Martian connect response:', response);
+      
+      if (response && response.address) {
+        walletAddress = response.address;
+        walletAccount = window.martian;
+        await onWalletConnected(response.address);
+        closeModal();
+        return;
+      }
+    }
+
+    // Fallback to WalletCore
     if (walletCore) {
       const wallets = walletCore.wallets || [];
       const petra = wallets.find(w =>
@@ -172,14 +219,15 @@ export async function connectWallet() {
       }
     }
 
-    toast('❌ Wallet tidak ditemukan', 'er');
+    toast('❌ Wallet not found. Please install Petra or Martian wallet.', 'er');
+    hd('s2'); sh('s1');
 
   } catch (err) {
     hd('s2'); sh('s1');
     const msg = err?.message || '';
 
     if (err?.code === 4001 || /cancel|reject|denied|user/i.test(msg)) {
-      toast('❌ Dibatalkan', 'er');
+      toast('❌ Connection cancelled', 'er');
       log('CONNECT · Cancelled', 'er');
     } else {
       toast('❌ ' + msg, 'er');
@@ -715,6 +763,25 @@ export function openModal() {
   const modal = document.getElementById('walletModal');
   if (modal) modal.classList.add('on');
   sh('s1'); hd('s2'); hd('s3'); hd('s4');
+  
+  // Update wallet status
+  updateWalletStatus();
+}
+
+// Update wallet status in modal
+function updateWalletStatus() {
+  const petraStatus = document.getElementById('petra-status');
+  const martianStatus = document.getElementById('martian-status');
+  
+  if (petraStatus) {
+    petraStatus.textContent = window.petra ? 'Available' : 'Not detected';
+    petraStatus.style.color = window.petra ? 'var(--success)' : 'var(--text-muted)';
+  }
+  
+  if (martianStatus) {
+    martianStatus.textContent = window.martian ? 'Available' : 'Not detected';
+    martianStatus.style.color = window.martian ? 'var(--success)' : 'var(--text-muted)';
+  }
 }
 
 export function closeModal() {
@@ -821,6 +888,7 @@ function initUI() {
     closeDiscModal,
     confirmDisconnect,
     connectWallet,
+    detectWallets,
     onSel,
     doUp,
     filt,

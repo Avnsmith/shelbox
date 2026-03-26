@@ -154,27 +154,49 @@ function extractAddr(obj) {
 
 // ── CONNECT ──────────────────────────────────────────
 export async function connectWallet() {
+  console.log('🔥 connectWallet called!');
+  
   hd('s1'); sh('s2');
   log('CONNECT · Starting...', 'in');
 
   try {
+    console.log('🔍 Checking walletCore:', !!walletCore);
+    console.log('🔍 window.aptos:', !!window.aptos);
+    console.log('🔍 window.petra:', !!window.petra);
+    
     if (walletCore) {
       const wallets = walletCore.wallets || [];
+      console.log('📱 Available wallets:', wallets.map(w => w.name));
+      console.log('📱 Wallet states:', wallets.map(w => `${w.name}: ${w.readyState}`));
+      
       const petra = wallets.find(w =>
         w.name === 'Petra' || w.name?.toLowerCase().includes('petra')
       );
 
       if (petra) {
         log('CONNECT · Petra → WalletCore', 'in');
-        await walletCore.connect(petra.name);
-        return;
+        console.log('🔗 Connecting to Petra via WalletCore...');
+        console.log('🔗 Petra readyState:', petra.readyState);
+        
+        if (petra.readyState === 'Installed') {
+          await walletCore.connect(petra.name);
+          return;
+        } else {
+          console.log('⚠️ Petra not installed, falling back to manual');
+        }
+      } else {
+        console.log('⚠️ Petra not found in WalletCore, falling back to manual');
       }
+    } else {
+      console.log('⚠️ WalletCore not initialized, using manual connection');
     }
 
     // Fallback to manual connection
+    console.log('🔄 Falling back to manual connection');
     await connectManual();
 
   } catch (err) {
+    console.error('❌ Connect error:', err);
     hd('s2'); sh('s1');
     const msg = err?.message || '';
 
@@ -189,17 +211,24 @@ export async function connectWallet() {
 }
 
 async function connectManual() {
+  console.log('🔄 connectManual called!');
   await new Promise(r => setTimeout(r, 300));
   log('DEBUG · aptos=' + (!!window.aptos) + ' petra=' + (!!window.petra), 'in');
+
+  console.log('🔍 Manual connection - window.aptos:', !!window.aptos);
+  console.log('🔍 Manual connection - window.petra:', !!window.petra);
 
   let resp = null;
 
   if (window.aptos?.connect) {
     try {
       log('CONNECT · window.aptos.connect()...', 'in');
+      console.log('🔗 Attempting window.aptos.connect()...');
       resp = await window.aptos.connect();
+      console.log('✅ window.aptos.connect() response:', resp);
       log('DEBUG · resp: ' + JSON.stringify(resp), 'in');
     } catch (e) {
+      console.error('❌ window.aptos.connect() error:', e);
       if (e?.code === 4001 || /cancel|reject|denied/i.test(e?.message || '')) {
         hd('s2'); sh('s1'); toast('❌ Cancelled', 'er'); return;
       }
@@ -210,9 +239,12 @@ async function connectManual() {
   if (!resp && window.petra?.connect) {
     try {
       log('CONNECT · window.petra.connect()...', 'in');
+      console.log('🔗 Attempting window.petra.connect()...');
       resp = await window.petra.connect();
+      console.log('✅ window.petra.connect() response:', resp);
       log('DEBUG · resp: ' + JSON.stringify(resp), 'in');
     } catch (e) {
+      console.error('❌ window.petra.connect() error:', e);
       if (e?.code === 4001 || /cancel|reject|denied/i.test(e?.message || '')) {
         hd('s2'); sh('s1'); toast('❌ Cancelled', 'er'); return;
       }
@@ -225,21 +257,28 @@ async function connectManual() {
     if (!window.aptos && !window.petra) {
       toast('❌ Petra not detected! Install Petra first.', 'er');
       log('ERROR · Install Petra from petra.app', 'er');
+      console.error('❌ No Petra wallet detected');
     } else {
       toast('❌ Petra not responding. Try Ctrl+Shift+R', 'er');
       log('ERROR · No response — hard refresh & retry', 'er');
+      console.error('❌ Petra detected but not responding');
     }
     return;
   }
 
+  console.log('✅ Connection successful, setting up wallet account');
   walletAccount = window.aptos; // ✅ ambil wallet asli Petra
 
   let addr = '';
 
   try {
+    console.log('🔍 Getting account address...');
     const acc = await window.aptos.account();
+    console.log('✅ Account response:', acc);
     addr = acc.address;
+    console.log('✅ Extracted address:', addr);
   } catch (e) {
+    console.error('❌ Cannot get address:', e);
     log('ERROR · Cannot get address: ' + e.message, 'er');
     return;
   }
@@ -248,9 +287,11 @@ async function connectManual() {
     hd('s2'); sh('s1');
     log('ERROR · Address empty', 'er');
     toast('❌ Failed to get wallet address', 'er');
+    console.error('❌ Address is empty');
     return;
   }
 
+  console.log('🎉 Success! Calling onWalletConnected with:', addr);
   walletAddress = addr;
   onWalletConnected(addr);
 }
@@ -499,6 +540,8 @@ function updateWalletStatus() {
 
 // ── UI INITIALIZATION ───────────────────────────────────
 function initUI() {
+  console.log('🎯 initUI called!');
+  
   // Set up modal backdrop click
   document.getElementById('walletModal')?.addEventListener('click', e => {
     if (e.target.id === 'walletModal') closeModal();
@@ -532,6 +575,9 @@ function initUI() {
     clrLog: clearLog,
     switchTab: handleSwitchTab,
   };
+  
+  console.log('🔧 window._sx exposed:', Object.keys(window._sx));
+  console.log('🔧 connectWallet function:', typeof window._sx.connectWallet);
 }
 
 // ── HELPER FUNCTIONS ────────────────────────────────────

@@ -7,6 +7,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     chunkSizeWarningLimit: 600,
+    target: 'es2020',
     rollupOptions: {
       external: [],
       output: {
@@ -15,7 +16,8 @@ export default defineConfig({
           if (id.includes('@aptos-labs/wallet-adapter-core')) {
             return 'wallet-core';
           }
-        }
+        },
+        format: 'es'
       }
     },
     commonjsOptions: {

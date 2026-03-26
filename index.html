@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Shelbox - Decentralized File Storage</title>
+  <script type="module" src="/main.js"></script>
+  <style>
+    :root{
+      --bg:#0a0a0a;
+      --surface:#1a1a1a;
+      --border:#2a2a2a;
+      --text:#ffffff;
+      --text-muted:#999999;
+      --primary:#00bcd4;
+      --primary-dark:#0097a7;
+      --success:#4caf50;
+      --success-light:#4caf5020;
+      --error:#f44336;
+      --error-light:#f4433620;
+      --warning:#ff9800;
+    }
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif;line-height:1.6;}
+    .wrap{max-width:1200px;margin:0 auto;padding:0 20px;}
+    .z{position:relative;z-index:1;}
+    
+    /* Header */
+    header{background:var(--surface);border-bottom:1px solid var(--border);padding:0;}
+    .hd{display:flex;align-items:center;justify-content:space-between;padding:16px 0;}
+    .logo h1{color:var(--primary);font-size:24px;font-weight:700;margin:0;}
+    .nav{display:flex;gap:24px;}
+    .ni{color:var(--text-muted);text-decoration:none;padding:8px 16px;border-radius:6px;transition:all .2s;}
+    .ni:hover,.ni.on{color:var(--text);background:var(--border);}
+    .wb{background:var(--primary);color:#fff;border:none;padding:10px 20px;border-radius:6px;font-weight:600;cursor:pointer;transition:all .2s;}
+    .wb:hover{background:var(--primary-dark);}
+    
+    /* Hero */
+    .hero{padding:80px 0;}
+    .hero-left{max-width:600px;}
+    .hero-tag{display:flex;align-items:center;gap:8px;color:var(--primary);font-size:14px;margin-bottom:16px;}
+    .dot-pk{width:8px;height:8px;background:var(--primary);border-radius:50%;}
+    .hero h1{font-size:48px;font-weight:700;margin-bottom:20px;line-height:1.2;}
+    .hero-desc{font-size:18px;color:var(--text-muted);margin-bottom:32px;}
+    .hero-btns{display:flex;gap:16px;flex-wrap:wrap;}
+    .btn-get{background:var(--primary);color:#fff;border:none;padding:12px 24px;border-radius:6px;font-weight:600;font-size:16px;cursor:pointer;transition:all .2s;}
+    .btn-get:hover{background:var(--primary-dark);}
+    .btn-out{color:var(--text);text-decoration:none;padding:12px 24px;border:1px solid var(--border);border-radius:6px;transition:all .2s;}
+    .btn-out:hover{border-color:var(--primary);color:var(--primary);}
+    .hero-right{max-width:400px;}
+    
+    /* Section */
+    .section{padding:60px 0;}
+    .sec-header{text-align:center;margin-bottom:48px;}
+    .sec-eyebrow{color:var(--primary);font-size:14px;margin-bottom:8px;}
+    .sec-title{font-size:36px;font-weight:700;margin-bottom:16px;}
+    .sec-desc{font-size:16px;color:var(--text-muted);max-width:600px;margin:0 auto;}
+    
+    /* Cards */
+    .glass-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;}
+    .gc-title{display:flex;align-items:center;gap:12px;font-size:18px;font-weight:600;margin-bottom:20px;}
+    .gc-icon{font-size:20px;}
+    .upload-layout{display:grid;grid-template-columns:1fr 1fr;gap:24px;}
+    
+    /* Upload */
+    .dz{border:2px dashed var(--border);border-radius:8px;padding:40px;text-align:center;transition:all .2s;cursor:pointer;}
+    .dz:hover{border-color:var(--primary);}
+    .dz-icon{font-size:48px;margin-bottom:16px;}
+    .dz h3{font-size:20px;margin-bottom:8px;}
+    .dz p{color:var(--text-muted);}
+    .sel-pill{background:var(--primary);color:#fff;padding:8px 16px;border-radius:20px;margin:16px 0;display:inline-block;}
+    .form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:16px 0;}
+    .fi label{display:block;margin-bottom:8px;font-size:14px;}
+    .fi input,.fi select{width:100%;padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);}
+    .btn-up{width:100%;background:var(--primary);color:#fff;border:none;padding:12px;border-radius:6px;font-weight:600;cursor:pointer;transition:all .2s;}
+    .btn-up:hover{background:var(--primary-dark);}
+    
+    /* Wallet Panel */
+    .wp{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:16px;margin-bottom:20px;}
+    .wa{font-size:14px;margin-bottom:12px;}
+    .wbs{display:flex;gap:16px;}
+    .wc{text-align:center;}
+    .wv{display:block;font-size:18px;font-weight:600;}
+    .wl{font-size:12px;color:var(--text-muted);}
+    
+    /* Progress */
+    .pw{display:none;margin:16px 0;}
+    .pw.on{display:block;}
+    .pl{display:flex;justify-content:space-between;font-size:14px;margin-bottom:8px;}
+    .pt{height:4px;background:var(--border);border-radius:2px;overflow:hidden;}
+    .pf{height:100%;background:var(--primary);transition:width .3s;}
+    
+    /* Tabs */
+    .tabs{display:flex;border-bottom:1px solid var(--border);margin-bottom:20px;}
+    .tab{padding:12px 16px;color:var(--text-muted);cursor:pointer;transition:all .2s;}
+    .tab.active{color:var(--text);border-bottom:2px solid var(--primary);}
+    
+    /* File List */
+    .file-list{max-height:400px;overflow-y:auto;}
+    .file-item{display:flex;align-items:center;justify-content:space-between;padding:12px;border-bottom:1px solid var(--border);}
+    .file-info{flex:1;}
+    .file-name{font-weight:500;margin-bottom:4px;}
+    .file-meta{font-size:12px;color:var(--text-muted);}
+    .file-actions{display:flex;gap:8px;}
+    .btn-small{padding:6px 12px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);cursor:pointer;font-size:12px;transition:all .2s;}
+    .btn-small:hover{border-color:var(--primary);}
+    
+    /* Modal */
+    .overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(8px);z-index:1000;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .3s;}
+    .overlay.on{opacity:1;pointer-events:all;}
+    .modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;max-width:400px;transform:translateY(16px);transition:all .3s;}
+    .overlay.on .modal{transform:translateY(0);}
+    .mh{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+    .mh h2{font-size:18px;font-weight:600;}
+    .mx{background:none;border:1px solid var(--border);color:var(--text-muted);width:32px;height:32px;border-radius:6px;font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;}
+    .mx:hover{border-color:var(--primary);color:var(--primary);}
+    .mb{padding:20px 24px;}
+    .md{font-size:12px;color:var(--text-muted);margin-bottom:16px;line-height:1.5;}
+    .wopts{display:flex;flex-direction:column;gap:8px;margin-bottom:16px;}
+    .wopt{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:8px;background:var(--bg);border:1px solid var(--border);cursor:pointer;transition:all .2s;}
+    .wopt:hover{border-color:var(--primary);}
+    .wo-ic{width:40px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px;background:var(--surface);flex-shrink:0;}
+    .wo-inf{flex:1;}
+    .wo-nm{font-weight:600;font-size:14px;margin-bottom:2px;}
+    .wo-sb{font-size:12px;color:var(--text-muted);}
+    
+    /* Responsive */
+    @media(max-width:768px){
+      .nav{display:none;}
+      .hero{flex-direction:column;text-align:center;padding:60px 0;}
+      .hero-left{margin-bottom:40px;}
+      .upload-layout,.form-row{grid-template-columns:1fr;}
+    }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header id="hdr">
+<div class="wrap hd z">
+  <div class="logo"><h1>📦 Shelbox</h1></div>
+  <nav class="nav">
+    <a class="ni on" href="#home">Home</a>
+    <a class="ni" href="#upload">Upload</a>
+    <a class="ni" href="#vault">Vault</a>
+    <a class="ni" href="#faucet">Faucet</a>
+  </nav>
+  <button class="wb" id="walletBtn" onclick="window._sx.openModal()">🔗 Connect Wallet</button>
+</div>
+</header>
+
+<!-- HERO -->
+<section class="hero z" id="home">
+<div class="wrap" style="display:flex;align-items:center;justify-content:space-between;width:100%;">
+  <div class="hero-left">
+    <div class="hero-tag"><div class="dot-pk"></div> Decentralized File Storage</div>
+    <h1>Upload. Store. Download.</h1>
+    <p class="hero-desc">Shelbox provides secure, decentralized file storage with full control over your data. Connect your wallet to get started.</p>
+    <div class="hero-btns">
+      <button class="btn-get" onclick="document.getElementById('walletBtn').click()">Connect Wallet →</button>
+      <a class="btn-out" href="#upload">📤 Upload Files</a>
+    </div>
+  </div>
+  <div class="hero-right">
+    <div style="text-align:center;padding:40px;background:var(--surface);border-radius:12px;border:1px solid var(--border);">
+      <div style="font-size:60px;margin-bottom:20px;">📦</div>
+      <h3 style="color:var(--text);margin-bottom:10px;">Welcome to Shelbox</h3>
+      <p style="color:var(--text-muted);">Your decentralized file storage solution</p>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- UPLOAD SECTION -->
+<section class="section z" id="upload">
+<div class="wrap">
+  <div class="sec-header">
+    <div class="sec-eyebrow">// storage vault</div>
+    <div class="sec-title">Upload & Manage Files</div>
+    <p class="sec-desc">Upload your files to the decentralized network. Every file is stored securely with transaction proof.</p>
+  </div>
+  <div class="upload-layout" id="vault">
+    <!-- UPLOAD -->
+    <div class="glass-card">
+      <div class="gc-title"><div class="gc-icon">📤</div> Upload File</div>
+      <div class="wp" id="wpanel">
+        <div class="wa">Connected: <strong id="ws">—</strong></div>
+        <div class="wbs">
+          <div class="wc"><span class="wv" id="apt">60</span><span class="wl">&nbsp;APT</span></div>
+          <div class="wc"><span class="wv" id="usd">20</span><span class="wl">&nbsp;ShelbyUSD</span></div>
+        </div>
+      </div>
+      <div class="dz" id="dz" onclick="document.getElementById('fin').click()">
+        <input type="file" id="fin" multiple onchange="window._sx.onSel(this)" style="display:none"/>
+        <div class="dz-icon">☁️</div>
+        <h3>Drop files here</h3>
+        <p>Click to browse or drag & drop</p>
+      </div>
+      <div class="sel-pill" id="sp" style="display:none;">📎 <span id="sn"></span></div>
+      <div class="form-row">
+        <div class="fi"><label>Blob Destination</label><input id="bd" placeholder="files/myfile.txt"/></div>
+        <div class="fi"><label>Expiry</label>
+          <select id="ex">
+            <option value="1d">1 Day</option>
+            <option value="7d">7 Days</option>
+            <option value="30d">30 Days</option>
+            <option value="1y" selected>1 Year</option>
+          </select>
+        </div>
+      </div>
+      <div class="pw" id="pw">
+        <div class="pl"><span id="pl">Uploading...</span><span id="pp">0%</span></div>
+        <div class="pt"><div class="pf" id="pf"></div></div>
+      </div>
+      <button class="btn-up" id="upBtn" onclick="window._sx.doUp()">🚀 Upload to Shelbox</button>
+    </div>
+    <!-- VAULT -->
+    <div class="glass-card">
+      <div class="gc-title" style="justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:10px;"><div class="gc-icon">🗄️</div> File Explorer</div>
+        <button class="panic" onclick="window._sx.pwipe()">⚠ WIPE</button>
+      </div>
+      <div class="tabs">
+        <div class="tab active" onclick="window._sx.switchTab(this, 'my')">My Files</div>
+        <div class="tab" onclick="window._sx.switchTab(this, 'all')">All Files</div>
+      </div>
+      <div class="file-list" id="fileList">
+        <!-- Files will be populated here -->
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- WALLET MODAL -->
+<div class="overlay" id="walletModal">
+  <div class="modal">
+    <div class="mh">
+      <h2>Connect Wallet</h2>
+      <div class="mx" onclick="window._sx.closeModal()">×</div>
+    </div>
+    <div class="mb">
+      <div class="md">Choose your preferred wallet to connect to Shelbox</div>
+      <div class="wopts">
+        <div class="wopt" onclick="window._sx.connectWallet('petra')">
+          <div class="wo-ic">🔗</div>
+          <div class="wo-inf">
+            <div class="wo-nm">Petra</div>
+            <div class="wo-sb">Popular Aptos wallet</div>
+          </div>
+        </div>
+        <div class="wopt" onclick="window._sx.connectWallet('martian')">
+          <div class="wo-ic">🚀</div>
+          <div class="wo-inf">
+            <div class="wo-nm">Martian</div>
+            <div class="wo-sb">Aptos wallet extension</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

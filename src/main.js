@@ -27,26 +27,36 @@ document.addEventListener('DOMContentLoaded', async () => {
 // ── WALLET CORE INIT ─────────────────────────────────
 async function initWalletCore() {
   try {
-    console.log('🔧 Initializing Aptos Wallet Adapter Core...');
+    console.log('🔧 Initializing Aptos Wallet Adapter Core with Shelbynet...');
 
-    // Initialize WalletCore with proper configuration
+    // Define Shelbynet network configuration
+    const shelbynet = {
+      name: 'Shelbynet',
+      chainId: 'shelbynet',
+      url: 'https://api.shelbynet.shelby.xyz/v1',
+      faucetUrl: 'https://faucet.shelbynet.shelby.xyz'
+    };
+
+    // Initialize WalletCore with Shelbynet network
     walletCore = new WalletCore(
       ["Petra", "Martian"], // Supported wallets
-      [], // No custom networks for now
+      [shelbynet], // Custom networks - Shelbynet
       {
         onError: (err) => {
           console.error('WalletCore error:', err);
           log('WALLET_ERR · ' + (err?.message || err), 'er');
         },
-        autoConnect: false // Don't auto-connect on init
+        autoConnect: false, // Don't auto-connect on init
+        defaultNetwork: shelbynet.name // Set Shelbynet as default
       }
     );
 
     // Wait for wallets to be registered
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 2000));
 
-    console.log('✅ WalletCore initialized');
+    console.log('✅ WalletCore initialized with Shelbynet');
     console.log('📋 Available wallets:', walletCore.wallets.map(w => w.name));
+    console.log('🌐 Available networks:', walletCore.networks.map(n => n.name));
     
     isWalletCoreInitialized = true;
     window.__walletCore = walletCore;
@@ -54,11 +64,37 @@ async function initWalletCore() {
     // Set up event listeners
     setupWalletEventListeners();
     
-    log('WALLET_CORE · Initialized with ' + walletCore.wallets.length + ' wallets', 'ok');
+    // Auto-switch to Shelbynet if possible
+    await switchToShelbynet();
+    
+    log('WALLET_CORE · Initialized with Shelbynet and ' + walletCore.wallets.length + ' wallets', 'ok');
     
   } catch (error) {
     console.error('❌ WalletCore initialization failed:', error);
     log('WALLET_CORE_INIT_FAILED · ' + error.message, 'er');
+  }
+}
+
+// ── SWITCH TO SHELBYNET ───────────────────────────────
+async function switchToShelbynet() {
+  try {
+    if (!walletCore) return;
+    
+    console.log('🔄 Switching to Shelbynet...');
+    
+    // Try to switch network to Shelbynet
+    const shelbynet = walletCore.networks.find(n => n.name === 'Shelbynet');
+    if (shelbynet) {
+      await walletCore.switchNetwork('Shelbynet');
+      console.log('✅ Switched to Shelbynet');
+      log('NETWORK · Switched to Shelbynet', 'ok');
+    } else {
+      console.warn('⚠️ Shelbynet not found in available networks');
+      log('NETWORK · Shelbynet not available', 'in');
+    }
+  } catch (error) {
+    console.warn('⚠️ Could not switch to Shelbynet:', error);
+    log('NETWORK_SWITCH_FAILED · ' + error.message, 'in');
   }
 }
 
@@ -135,7 +171,7 @@ export async function connectWallet(walletName = 'Petra') {
   }
 
   try {
-    log('CONNECT · Connecting to ' + walletName + '...', 'in');
+    log('CONNECT · Connecting to ' + walletName + ' on Shelbynet...', 'in');
     
     // Find the wallet
     const wallet = walletCore.wallets.find(w => w.name === walletName);
@@ -149,10 +185,24 @@ export async function connectWallet(walletName = 'Petra') {
     if (wallet.readyState !== 'Installed') {
       toast('❌ ' + walletName + ' wallet not installed', 'er');
       log('WALLET_NOT_INSTALLED · ' + walletName, 'er');
+      // Provide installation link
+      if (walletName === 'Petra') {
+        toast('💡 Install Petra: https://petra.app', 'in');
+      } else if (walletName === 'Martian') {
+        toast('💡 Install Martian: https://www.martianwallet.xyz/', 'in');
+      }
       return;
     }
 
+    // Check if wallet is on correct network
+    const currentNetwork = walletCore.network;
+    if (currentNetwork?.name !== 'Shelbynet') {
+      log('NETWORK · Switching to Shelbynet before connection...', 'in');
+      await switchToShelbynet();
+    }
+
     // Connect to the wallet
+    console.log('🔗 Connecting to ' + walletName + '...');
     await walletCore.connect(walletName);
     
   } catch (error) {
@@ -162,6 +212,13 @@ export async function connectWallet(walletName = 'Petra') {
     if (error?.code === 4001 || /cancel|reject|denied|user/i.test(msg)) {
       toast('❌ Connection cancelled', 'er');
       log('CONNECT_CANCELLED', 'er');
+    } else if (error?.message?.includes('network')) {
+      toast('❌ Network error. Make sure Petra is on Shelbynet', 'er');
+      log('NETWORK_ERROR · ' + msg, 'er');
+      // Show network setup instructions
+      setTimeout(() => {
+        toast('💡 Setup Shelbynet in Petra: Settings → Network → Add Custom', 'in');
+      }, 2000);
     } else {
       toast('❌ ' + msg, 'er');
       log('CONNECT_ERROR · ' + msg, 'er');
@@ -206,6 +263,19 @@ async function onWalletConnected(address) {
     const walletStatus = document.getElementById('ws');
     if (walletStatus) {
       walletStatus.textContent = address.slice(0, 6) + '...' + address.slice(-4);
+    }
+
+    // Update network status
+    const networkStatus = document.getElementById('network-status');
+    if (networkStatus) {
+      const currentNetwork = walletCore?.network;
+      if (currentNetwork) {
+        networkStatus.textContent = currentNetwork.name;
+        networkStatus.style.color = currentNetwork.name === 'Shelbynet' ? 'var(--success)' : 'var(--warning)';
+      } else {
+        networkStatus.textContent = 'Unknown';
+        networkStatus.style.color = 'var(--error)';
+      }
     }
 
     // Update wallet button

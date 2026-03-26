@@ -185,6 +185,7 @@
       <div class="gc-title"><div class="gc-icon">📤</div> Upload File</div>
       <div class="wp" id="wpanel">
         <div class="wa">Connected: <strong id="ws">—</strong></div>
+        <div class="wa" style="font-size:11px; color:var(--text-muted);">Network: <strong id="network-status">Shelbynet</strong></div>
         <div class="wbs">
           <div class="wc"><span class="wv" id="apt">60</span><span class="wl">&nbsp;APT</span></div>
           <div class="wc"><span class="wv" id="usd">20</span><span class="wl">&nbsp;ShelbyUSD</span></div>
@@ -240,16 +241,16 @@
       <div class="mx" onclick="window._sx.closeModal()">×</div>
     </div>
     <div class="mb">
-      <div class="md">Choose your preferred wallet to connect to Shelbox</div>
+      <div class="md">Connect your wallet to Shelbox on Shelbynet network</div>
       <div class="wopts">
-        <div class="wopt" onclick="window._sx.connectWallet('petra')">
+        <div class="wopt" onclick="window._sx.connectWallet('Petra')">
           <div class="wo-ic">🔗</div>
           <div class="wo-inf">
             <div class="wo-nm">Petra</div>
             <div class="wo-sb" id="petra-status">Checking...</div>
           </div>
         </div>
-        <div class="wopt" onclick="window._sx.connectWallet('martian')">
+        <div class="wopt" onclick="window._sx.connectWallet('Martian')">
           <div class="wo-ic">🚀</div>
           <div class="wo-inf">
             <div class="wo-nm">Martian</div>
@@ -257,8 +258,25 @@
           </div>
         </div>
       </div>
-      <div class="md" style="margin-top:16px; font-size:11px;">
-        💡 Don't have a wallet? Install <a href="https://petra.app" target="_blank" style="color:var(--primary);">Petra</a> or <a href="https://www.martianwallet.xyz/" target="_blank" style="color:var(--primary);">Martian</a>
+      
+      <!-- Shelbynet Setup Instructions -->
+      <div class="md" style="margin-top:20px; padding:12px; background:var(--surface); border-radius:6px; border:1px solid var(--border);">
+        <div style="font-weight:600; margin-bottom:8px; color:var(--primary);">🌐 Shelbynet Setup Required</div>
+        <div style="font-size:11px; line-height:1.4;">
+          <div style="margin-bottom:6px;"><strong>1.</strong> Install <a href="https://petra.app" target="_blank" style="color:var(--primary);">Petra Wallet</a></div>
+          <div style="margin-bottom:6px;"><strong>2.</strong> Open Petra → Settings → Network</div>
+          <div style="margin-bottom:6px;"><strong>3.</strong> Add Custom Network:</div>
+          <div style="margin-left:20px; margin-bottom:4px;">
+            <div>Name: <code style="background:var(--bg); padding:2px 4px; border-radius:3px;">Shelbynet</code></div>
+            <div>Node URL: <code style="background:var(--bg); padding:2px 4px; border-radius:3px;">https://api.shelbynet.shelby.xyz/v1</code></div>
+            <div>Faucet: <code style="background:var(--bg); padding:2px 4px; border-radius:3px;">https://faucet.shelbynet.shelby.xyz</code></div>
+          </div>
+          <div><strong>4.</strong> Switch to Shelbynet network</div>
+        </div>
+      </div>
+      
+      <div class="md" style="margin-top:12px; font-size:11px;">
+        💡 Already have Shelbynet setup? Click connect above!
       </div>
     </div>
   </div>
